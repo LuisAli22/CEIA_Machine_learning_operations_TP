@@ -157,3 +157,12 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .DS_store
+
+# Local development setup scripts
+setup_local_dev.bat
+install_dependencies.bat
+
+# Airflow temporary files
+airflow/dags/data/temp_*.parquet
+airflow/dags/data/temp_*.pkl
+airflow/logs/
