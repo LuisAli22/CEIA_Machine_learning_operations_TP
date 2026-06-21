@@ -3,8 +3,8 @@
 ### MLOps1 - CEIA - FIUBA
 
 **Integrantes:**
-* Luis Ali (A2401)
-* Santiago Bartolini Rizzo (A2402)
+* Luis Ali (a2401)
+* Santiago Bartolini Rizzo (a2402)
 
 ### Descripción
 
