@@ -85,38 +85,66 @@ El modelo entrenado con el DAG `process_cern_data` predice la **masa invariante 
 
 #### Ejemplo de Request
 
+**Linux/macOS/WSL:**
 ```bash
 curl -X POST "http://localhost:8800/predict" \
   -H "Content-Type: application/json" \
   -d '{
-    "data": [
-      {
-        "pt1": 76.4,
-        "pt2": 37.3,
-        "E_total": 122.0,
-        "delta_eta": 0.02,
-        "delta_phi": 2.80,
-        "delta_R": 2.80,
-        "pt_product": 2849.72,
-        "pt_ratio": 2.05,
-        "is_os": 1
-      }
-    ]
+    "data": {
+      "pt1": 11.4625,
+      "pt2": 2.01051,
+      "E_total": 24.79094,
+      "delta_eta": 1.276837,
+      "delta_phi": 1.264423,
+      "delta_R": 1.796964,
+      "pt_product": 23.045471,
+      "pt_ratio": 5.701290,
+      "is_os": 1
+    },
+    "return_probabilities": false
   }'
 ```
+
+**Windows (usar CMD o Git Bash, NO PowerShell):**
+
+Primero crea un archivo `test_prediction.json`:
+```json
+{
+  "data": {
+    "pt1": 11.4625,
+    "pt2": 2.01051,
+    "E_total": 24.79094,
+    "delta_eta": 1.276837,
+    "delta_phi": 1.264423,
+    "delta_R": 1.796964,
+    "pt_product": 23.045471,
+    "pt_ratio": 5.701290,
+    "is_os": 1
+  },
+  "return_probabilities": false
+}
+```
+
+Luego ejecuta desde CMD o Git Bash:
+```cmd
+curl.exe -X POST http://localhost:8800/predict -H "Content-Type: application/json" -d "@test_prediction.json"
+```
+
+> **Nota**: En Windows, es recomendable usar CMD (Símbolo del sistema) o Git Bash en lugar de PowerShell, ya que PowerShell tiene problemas con las comillas en los comandos curl.
 
 #### Respuesta
 
 ```json
 {
-  "predictions": [90.5],
+  "predictions": [14.888267257690413],
+  "probabilities": null,
   "model_name": "cern_xgboost",
   "model_version": "1",
-  "timestamp": "2024-01-01T00:00:00"
+  "timestamp": "2026-06-21T05:27:29.894940"
 }
 ```
 
-La predicción `90.5` representa la masa invariante estimada en GeV/c².
+La predicción `14.888267257690413` representa la masa invariante estimada en GeV/c².
 
 **Nota**: Para obtener datos reales del dataset procesado:
 
@@ -136,6 +164,7 @@ print(df.select(features).head(1).to_dicts()[0])
 
 Para otros modelos, el formato general es:
 
+**Linux/macOS/WSL:**
 ```bash
 curl -X POST "http://localhost:8800/predict" \
   -H "Content-Type: application/json" \
@@ -147,6 +176,8 @@ curl -X POST "http://localhost:8800/predict" \
     "return_probabilities": true
   }'
 ```
+
+**Windows:** Se recomienda usar un archivo JSON como en el ejemplo anterior para evitar problemas con las comillas.
 
 ### Respuesta con Probabilidades
 

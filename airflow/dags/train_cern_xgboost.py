@@ -34,8 +34,8 @@ EXPERIMENT_NAME = "cern_electron_collision"
 DATA_PATH = "/opt/airflow/dags/data/dielectron.parquet"
 
 # Optuna configuration
-N_TRIALS = 50  # Number of optimization trials
-CV_FOLDS = 5   # Cross-validation folds
+N_TRIALS = 5   # Number of optimization trials (reduced for low resources)
+CV_FOLDS = 2   # Cross-validation folds (reduced for low resources)
 
 # Model parameters (will be overridden by Optuna)
 XGBOOST_PARAMS = {
@@ -112,6 +112,21 @@ def load_and_prepare_data(**context) -> Dict[str, Any]:
     print("Cargando datos de colisiones de electrones CERN...")
     df = load_parquet_data(DATA_PATH)
     X, y = prepare_features_target(df, FEATURES, TARGET)
+    
+    # Validate data
+    print("Validando datos...")
+    print(f"  - NaN en X: {np.isnan(X).sum()}")
+    print(f"  - Inf en X: {np.isinf(X).sum()}")
+    print(f"  - NaN en y: {np.isnan(y).sum()}")
+    print(f"  - Inf en y: {np.isinf(y).sum()}")
+    
+    # Remove any rows with NaN or Inf
+    mask = ~(np.isnan(X).any(axis=1) | np.isinf(X).any(axis=1) | np.isnan(y) | np.isinf(y))
+    if not mask.all():
+        print(f"  - Eliminando {(~mask).sum()} filas con valores inválidos")
+        X = X[mask]
+        y = y[mask]
+    
     X_train, X_test, y_train, y_test = split_train_test(X, y, TEST_SIZE, RANDOM_STATE)
 
     data_info = {
@@ -139,44 +154,52 @@ def load_and_prepare_data(**context) -> Dict[str, Any]:
 
 def create_optuna_objective(X_train: np.ndarray, y_train: np.ndarray):
     def objective(trial: optuna.Trial) -> float:
-        estimator_amount = trial.suggest_int('estimator_amount', 100, 500)
-        max_depth = trial.suggest_int('max_depth', 3, 10)
-        learning_rate = trial.suggest_float('learning_rate', 0.01, 0.3, log=True)
-        subsample_ratio = trial.suggest_float('subsample_ratio', 0.6, 1.0)
-        column_sample_ratio = trial.suggest_float('column_sample_ratio', 0.6, 1.0)
-        min_child_weight = trial.suggest_int('min_child_weight', 1, 10)
-        gamma = trial.suggest_float('gamma', 0.0, 0.5)
-        regularization_alpha = trial.suggest_float('regularization_alpha', 0.0, 1.0)
-        regularization_lambda = trial.suggest_float('regularization_lambda', 0.0, 1.0)
+        try:
+            estimator_amount = trial.suggest_int('estimator_amount', 100, 500)
+            max_depth = trial.suggest_int('max_depth', 3, 10)
+            learning_rate = trial.suggest_float('learning_rate', 0.01, 0.3, log=True)
+            subsample_ratio = trial.suggest_float('subsample_ratio', 0.6, 1.0)
+            column_sample_ratio = trial.suggest_float('column_sample_ratio', 0.6, 1.0)
+            min_child_weight = trial.suggest_int('min_child_weight', 1, 10)
+            gamma = trial.suggest_float('gamma', 0.0, 0.5)
+            regularization_alpha = trial.suggest_float('regularization_alpha', 0.0, 1.0)
+            regularization_lambda = trial.suggest_float('regularization_lambda', 0.0, 1.0)
 
-        # Map readable names to XGBoost parameter names
-        params = {
-            'n_estimators': estimator_amount,
-            'max_depth': max_depth,
-            'learning_rate': learning_rate,
-            'subsample': subsample_ratio,
-            'colsample_bytree': column_sample_ratio,
-            'min_child_weight': min_child_weight,
-            'gamma': gamma,
-            'reg_alpha': regularization_alpha,
-            'reg_lambda': regularization_lambda,
-            'random_state': 42,
-            'n_jobs': -1
-        }
+            # Map readable names to XGBoost parameter names
+            params = {
+                'n_estimators': estimator_amount,
+                'max_depth': max_depth,
+                'learning_rate': learning_rate,
+                'subsample': subsample_ratio,
+                'colsample_bytree': column_sample_ratio,
+                'min_child_weight': min_child_weight,
+                'gamma': gamma,
+                'reg_alpha': regularization_alpha,
+                'reg_lambda': regularization_lambda,
+                'random_state': 42,
+                'n_jobs': 1  # Force single thread to avoid memory issues
+            }
 
-        # Create and evaluate model with cross-validation
-        model = xgb.XGBRegressor(**params)
+            # Create and evaluate model with cross-validation
+            model = xgb.XGBRegressor(**params)
 
-        # Use negative RMSE as score (Optuna maximizes, so we use negative)
-        scores = cross_val_score(
-            model, X_train, y_train,
-            cv=CV_FOLDS,
-            scoring='neg_root_mean_squared_error',
-            n_jobs=-1
-        )
+            # Use negative RMSE as score (Optuna maximizes, so we use negative)
+            # Set error_score to return a large penalty instead of failing
+            scores = cross_val_score(
+                model, X_train, y_train,
+                cv=CV_FOLDS,
+                scoring='neg_root_mean_squared_error',
+                n_jobs=1,  # Force single thread
+                error_score='raise'  # Raise error to see what's failing
+            )
 
-        # Return mean score (negative RMSE)
-        return scores.mean()
+            # Return mean score (negative RMSE)
+            return scores.mean()
+        except Exception as e:
+            print(f"Error in trial {trial.number}: {str(e)}")
+            print(f"Parameters that caused error: {trial.params}")
+            # Return a large penalty so Optuna learns to avoid these parameters
+            return -999999.0
 
     return objective
 
@@ -420,7 +443,7 @@ with DAG(
     'train_cern_xgboost',
     default_args=default_args,
     description='Train XGBoost model on CERN electron collision data with Optuna optimization',
-    schedule='@weekly',
+    schedule=None,  # Manual execution only (changed from @weekly)
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=['ml', 'training', 'cern', 'xgboost', 'optuna'],

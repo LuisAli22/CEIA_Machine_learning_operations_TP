@@ -166,3 +166,7 @@ install_dependencies.bat
 airflow/dags/data/temp_*.parquet
 airflow/dags/data/temp_*.pkl
 airflow/logs/
+
+# Model files (too large for GitHub)
+*.pkl
+notebook_example/

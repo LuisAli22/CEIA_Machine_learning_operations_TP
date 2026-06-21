@@ -1,0 +1,14 @@
+{
+  "data": {
+    "pt1": 11.4625,
+    "pt2": 2.01051,
+    "E_total": 24.79094,
+    "delta_eta": 1.276837,
+    "delta_phi": 1.264423,
+    "delta_R": 1.796964,
+    "pt_product": 23.045471,
+    "pt_ratio": 5.701290,
+    "is_os": 1
+  },
+  "return_probabilities": false
+}
