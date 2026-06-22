@@ -24,6 +24,83 @@ def get_postgres_connection():
         password=os.getenv('PG_PASSWORD', 'airflow')
     )
 
+def ensure_metrics_table_exists():
+    """
+    Create ml_metrics schema and model_training table if they don't exist.
+    This ensures the table is available even if the initialization script didn't run.
+    """
+    conn = get_postgres_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Create schema
+        cur.execute("CREATE SCHEMA IF NOT EXISTS ml_metrics;")
+        
+        # Create table
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS ml_metrics.model_training (
+            id SERIAL PRIMARY KEY,
+            run_id VARCHAR(255) NOT NULL,
+            model_name VARCHAR(255) NOT NULL,
+            experiment_name VARCHAR(255),
+            training_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            
+            -- Metrics
+            train_r2 FLOAT,
+            test_r2 FLOAT,
+            train_mae FLOAT,
+            test_mae FLOAT,
+            train_rmse FLOAT,
+            test_rmse FLOAT,
+            test_mape FLOAT,
+            
+            -- Optuna metrics
+            optuna_best_cv_rmse FLOAT,
+            n_trials INT,
+            
+            -- Model parameters (stored as JSONB for flexibility)
+            model_params JSONB,
+            
+            -- Dataset info
+            train_size INT,
+            test_size INT,
+            n_features INT,
+            target_mean FLOAT,
+            target_std FLOAT,
+            
+            -- Validation
+            is_valid BOOLEAN,
+            is_promoted BOOLEAN DEFAULT FALSE,
+            model_version VARCHAR(50),
+            model_stage VARCHAR(50),
+            
+            -- Metadata
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            
+            UNIQUE(run_id)
+        );
+        """
+        cur.execute(create_table_query)
+        
+        # Create indexes
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_training_date ON ml_metrics.model_training(training_date DESC);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_model_name ON ml_metrics.model_training(model_name);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_run_id ON ml_metrics.model_training(run_id);")
+        
+        # Grant permissions
+        cur.execute("GRANT USAGE ON SCHEMA ml_metrics TO airflow;")
+        cur.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ml_metrics TO airflow;")
+        cur.execute("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA ml_metrics TO airflow;")
+        
+        conn.commit()
+        print("✓ Tabla ml_metrics.model_training verificada/creada")
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"⚠ Error verificando tabla: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
 
 def insert_training_metrics(
     run_id: str,
@@ -53,6 +130,7 @@ def insert_training_metrics(
     Returns:
         int: ID of inserted record
     """
+    ensure_metrics_table_exists()
     conn = get_postgres_connection()
     cur = conn.cursor()
     

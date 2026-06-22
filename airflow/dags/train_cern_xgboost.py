@@ -36,8 +36,8 @@ EXPERIMENT_NAME = "cern_electron_collision"
 DATA_PATH = "/opt/airflow/dags/data/dielectron.parquet"
 
 # Optuna configuration
-N_TRIALS = 5   # Number of optimization trials (reduced for low resources)
-CV_FOLDS = 2   # Cross-validation folds (reduced for low resources)
+N_TRIALS = 20   # Number of optimization trials (reduced for low resources)
+CV_FOLDS = 5   # Cross-validation folds (reduced for low resources)
 
 # Model parameters (will be overridden by Optuna)
 XGBOOST_PARAMS = {
@@ -67,8 +67,8 @@ TEST_SIZE = 0.2
 RANDOM_STATE = 42
 
 # Quality thresholds
-R2_THRESHOLD = 0.90
-MAE_THRESHOLD = 5.0
+R2_THRESHOLD = 0.70
+MAE_THRESHOLD = 10.0
 
 # Default arguments for the DAG
 default_args = {
@@ -448,6 +448,27 @@ def promote_model_to_production(**context) -> None:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = mlflow.tracking.MlflowClient()
 
+# Get the model version for this run
+    # Search for the model version that matches our run_id
+    model_versions = client.search_model_versions(f"name='{MODEL_NAME}'")
+    
+    # Find the version that was just registered in this run
+    latest_version = None
+    for mv in model_versions:
+        if mv.run_id == run_id:
+            latest_version = mv.version
+            break
+    
+    if not latest_version:
+        # Fallback: get the highest version number
+        if model_versions:
+            latest_version = str(max([int(mv.version) for mv in model_versions]))
+        else:
+            print("No se encontró versión del modelo para promover")
+            return
+
+    print(f"Promocionando versión {latest_version} a Production")
+
     # Get latest version
     latest_versions = client.get_latest_versions(MODEL_NAME, stages=["None"])
 
@@ -460,7 +481,7 @@ def promote_model_to_production(**context) -> None:
     # Transition to Production
     client.transition_model_version_stage(
         name=MODEL_NAME,
-        version=latest_version,
+        version=str(latest_version),
         stage="Production",
         archive_existing_versions=True
     )

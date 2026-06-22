@@ -21,7 +21,7 @@
 # WARNING: This configuration is for local development. Do not use it in a production deployment.
 x-airflow-common: &airflow-common
   build: './dockerfiles/airflow'
-  image: ${AIRFLOW_IMAGE_NAME:-extending_airflow:latest}
+  #image: ${AIRFLOW_IMAGE_NAME:-extending_airflow:latest}
   profiles:
     - airflow
     - all
@@ -182,7 +182,7 @@ services:
   mlflow:
     restart: always
     build: "./dockerfiles/mlflow"
-    image: mlflow
+    #image: mlflow
     container_name: mlflow
     profiles:
       - mlflow
@@ -220,7 +220,7 @@ services:
   fastapi:
     restart: always
     build: "./dockerfiles/fastapi"
-    image: backend_fastapi
+    #image: backend_fastapi
     container_name: fastapi
     profiles:
       - all
