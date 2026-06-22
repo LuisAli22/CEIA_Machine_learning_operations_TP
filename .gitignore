@@ -162,6 +162,10 @@ cython_debug/
 setup_local_dev.bat
 install_dependencies.bat
 
+# Test files
+test_prediction.json
+test_cern.json
+
 # Airflow temporary files
 airflow/dags/data/temp_*.parquet
 airflow/dags/data/temp_*.pkl
@@ -170,3 +174,4 @@ airflow/logs/
 # Model files (too large for GitHub)
 *.pkl
 notebook_example/
+POSTGRES_METRICS_SETUP.md

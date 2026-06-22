@@ -1,0 +1,139 @@
+/* CERN Theme for Swagger UI */
+
+/* Main colors inspired by CERN branding */
+:root {
+    --cern-blue: #0053A1;
+    --cern-light-blue: #0066CC;
+    --cern-dark-blue: #003A70;
+    --cern-accent: #00A3E0;
+}
+
+/* Header styling */
+.swagger-ui .topbar {
+    background-color: var(--cern-blue) !important;
+    padding: 15px 0 !important;
+}
+
+.swagger-ui .topbar .link {
+    color: white !important;
+}
+
+/* Info section */
+.swagger-ui .info {
+    margin: 30px 0 !important;
+}
+
+.swagger-ui .info .title {
+    color: var(--cern-blue) !important;
+    font-size: 36px !important;
+    font-weight: bold !important;
+}
+
+.swagger-ui .info .description {
+    color: #333 !important;
+    line-height: 1.6 !important;
+}
+
+/* Operation tags */
+.swagger-ui .opblock-tag {
+    color: var(--cern-dark-blue) !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    border-bottom: 3px solid var(--cern-accent) !important;
+    padding-bottom: 10px !important;
+}
+
+/* Endpoints */
+.swagger-ui .opblock.opblock-post {
+    border-color: var(--cern-blue) !important;
+    background-color: rgba(0, 83, 161, 0.05) !important;
+}
+
+.swagger-ui .opblock.opblock-post .opblock-summary-method {
+    background-color: var(--cern-blue) !important;
+}
+
+.swagger-ui .opblock.opblock-get {
+    border-color: var(--cern-accent) !important;
+    background-color: rgba(0, 163, 224, 0.05) !important;
+}
+
+.swagger-ui .opblock.opblock-get .opblock-summary-method {
+    background-color: var(--cern-accent) !important;
+}
+
+/* Try it out button */
+.swagger-ui .btn.execute {
+    background-color: var(--cern-blue) !important;
+    border-color: var(--cern-dark-blue) !important;
+    color: white !important;
+}
+
+.swagger-ui .btn.execute:hover {
+    background-color: var(--cern-dark-blue) !important;
+}
+
+/* Response section */
+.swagger-ui .responses-inner h4,
+.swagger-ui .responses-inner h5 {
+    color: var(--cern-blue) !important;
+}
+
+/* Schema section */
+.swagger-ui .model-box {
+    background-color: rgba(0, 83, 161, 0.03) !important;
+}
+
+.swagger-ui .model-title {
+    color: var(--cern-blue) !important;
+    font-weight: 600 !important;
+}
+
+/* Authorization button */
+.swagger-ui .btn.authorize {
+    border-color: var(--cern-blue) !important;
+    color: var(--cern-blue) !important;
+}
+
+.swagger-ui .btn.authorize svg {
+    fill: var(--cern-blue) !important;
+}
+
+/* Links */
+.swagger-ui a {
+    color: var(--cern-light-blue) !important;
+}
+
+.swagger-ui a:hover {
+    color: var(--cern-dark-blue) !important;
+}
+
+/* Custom header banner */
+.cern-banner {
+    background: linear-gradient(135deg, var(--cern-blue) 0%, var(--cern-dark-blue) 100%);
+    color: white;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.cern-banner h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+.cern-banner .subtitle {
+    margin: 5px 0 0 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* Add particle physics themed emojis */
+.swagger-ui .opblock-tag:before {
+    content: "⚛️ ";
+    margin-right: 8px;
+}

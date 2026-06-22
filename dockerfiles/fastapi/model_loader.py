@@ -119,11 +119,30 @@ class MLflowModelLoader(ModelLoaderInterface):
             self._model = mlflow.pyfunc.load_model(model_uri)
             self._loaded_at = datetime.utcnow()
 
-            # Store model metadata
+            # Get actual model version from MLflow (not from settings)
+            client = mlflow.tracking.MlflowClient()
+            actual_version = self._settings.model_version
+            actual_stage = self._settings.model_stage
+            
+            # If loading by stage, get the actual version that was loaded
+            if self._settings.model_stage and self._settings.model_stage != "None":
+                try:
+                    versions = client.get_latest_versions(
+                        self._settings.model_name,
+                        stages=[self._settings.model_stage]
+                    )
+                    if versions:
+                        actual_version = versions[0].version
+                        actual_stage = versions[0].current_stage
+                        logger.info(f"Resolved stage '{self._settings.model_stage}' to version {actual_version}")
+                except Exception as e:
+                    logger.warning(f"Could not resolve actual version: {str(e)}")
+
+            # Store model metadata with actual version
             self._model_info = {
                 "name": self._settings.model_name,
-                "version": self._settings.model_version,
-                "stage": self._settings.model_stage,
+                "version": actual_version,
+                "stage": actual_stage,
                 "uri": model_uri,
                 "loaded_at": self._loaded_at.isoformat()
             }

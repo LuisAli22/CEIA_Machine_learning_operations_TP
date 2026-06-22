@@ -10,8 +10,10 @@ from contextlib import asynccontextmanager
 from typing import Dict
 
 from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_swagger_ui_html
 
 from config import Settings, get_settings
 from schemas import (
@@ -19,10 +21,13 @@ from schemas import (
     PredictionRequest,
     PredictionResponse,
     ErrorResponse,
-    ModelInfo
+    ModelInfo,
+    CERNElectronPair,
+    CERNPredictionResponse
 )
 from model_loader import ModelLoaderInterface, get_model_loader
 from predictor import Predictor
+from cern_features import calculate_cern_features
 from exceptions import (
     ModelServiceException,
     ModelNotLoadedException,
@@ -77,12 +82,57 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="ML Model Service",
-    description="Production-ready ML model serving API with MLflow integration",
+    title="CERN Particle Physics ML Service",
+    description="""
+Servicio de Machine Learning para predicción de masa invariante de pares de electrones 
+a partir de datos de colisiones de partículas del experimento CMS (CERN).
+
+**Características principales:**
+- Predicción de masa invariante con modelo XGBoost entrenado en datos reales de CERN
+- Validación automática de rangos físicos
+- Cálculo automático de características derivadas
+- Integración con MLflow para versionado de modelos
+- Monitoreo del estado del servicio
+
+**Uso recomendado:** POST /predict
+    """,
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    contact={
+        "name": "CEIA MLOps Team",
+        "url": "https://github.com/yourusername/CEIA_Machine_learning_operations_TP",
+    },
+    license_info={
+        "name": "MIT",
+    },
+    openapi_tags=[
+        {
+            "name": "Prediction",
+            "description": "Predicción de masa invariante para datos de CERN"
+        },
+        {
+            "name": "Model",
+            "description": "Gestión y consulta de modelos"
+        },
+        {
+            "name": "Health",
+            "description": "Monitoreo del servicio"
+        },
+        {
+            "name": "General",
+            "description": "Información general"
+        }
+    ],
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": -1,  # Hide models section by default
+        "docExpansion": "list",  # Show only tags by default
+        "filter": True,  # Enable search filter
+        "syntaxHighlight.theme": "monokai"  # Code highlighting theme
+    }
 )
 
+# Mount static files for custom CSS
+import os
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -183,20 +233,22 @@ async def model_service_handler(request, exc: ModelServiceException):
     "/",
     response_model=Dict[str, str],
     tags=["General"],
-    summary="Root endpoint"
+    summary="Información de la API"
 )
 async def read_root() -> Dict[str, str]:
     """
-    Root endpoint.
-
-    Returns:
-        dict: Welcome message
+    Información básica sobre el servicio de predicción de masa invariante.
     """
     settings = get_settings()
     return {
-        "message": f"Welcome to {settings.app_name}",
+        "service": "CERN Particle Physics ML Service",
+        "description": "Predicción de masa invariante de pares de electrones",
         "version": settings.app_version,
-        "docs": "/docs"
+        "model": "XGBoost trained on CMS data",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "health": "/health",
+        "predict": "/predict"
     }
 
 
@@ -293,9 +345,9 @@ async def reload_model(settings: Settings = Depends(get_settings)) -> Dict[str, 
 
 @app.post(
     "/predict",
-    response_model=PredictionResponse,
+    response_model=CERNPredictionResponse,
     tags=["Prediction"],
-    summary="Make predictions",
+    summary="Predicción de masa invariante",
     responses={
         200: {"description": "Successful prediction"},
         422: {"model": ErrorResponse, "description": "Invalid input"},
@@ -304,45 +356,60 @@ async def reload_model(settings: Settings = Depends(get_settings)) -> Dict[str, 
     }
 )
 async def predict(
-    request: PredictionRequest,
+    electron_pair: CERNElectronPair,
     predictor: Predictor = Depends(get_predictor),
     settings: Settings = Depends(get_settings)
-) -> PredictionResponse:
+) -> CERNPredictionResponse:
     """
-    Make predictions on input data.
-
-    Args:
-        request: Prediction request with input data
-        predictor: Predictor instance (injected)
-        settings: Application settings (injected)
-
-    Returns:
-        PredictionResponse: Prediction results
-
-    Raises:
-        HTTPException: If prediction fails
+    Predecir masa invariante de un par de electrones del experimento CMS.
+    
+    Entrada:
+    - pt1, pt2: Momento transversal de cada electrón (GeV/c), debe ser > 0
+    - eta1, eta2: Pseudorapidez, rango [-5, 5]
+    - phi1, phi2: Ángulo azimutal en radianes, rango [-π, π]
+    - charge1, charge2: Carga eléctrica, valores {-1, 1}
+    
+    El backend calcula automáticamente las características derivadas:
+    E_total, delta_eta, delta_phi, delta_R, pt_product, pt_ratio, is_os
+    
+    Retorna:
+    - predicted_mass: Masa invariante estimada (GeV/c²)
+    - input_features: Todas las características calculadas
+    - model_name, model_version: Información del modelo
     """
-    logger.info("Received prediction request")
-
-    # Make prediction
-    result = predictor.predict(
-        data=request.data,
-        return_probabilities=request.return_probabilities
-    )
-
-    # Get model info
-    model_info = model_loader.get_model_info()
-
-    # Build response
-    response = PredictionResponse(
-        predictions=result["predictions"],
-        probabilities=result.get("probabilities"),
-        model_name=model_info.get("name", settings.model_name),
-        model_version=model_info.get("version", settings.model_version)
-    )
-
-    logger.info("Prediction request completed successfully")
-    return response
+    logger.info(f"Received CERN prediction request: pt1={electron_pair.pt1}, pt2={electron_pair.pt2}")
+    
+    try:
+        # Calculate features from raw measurements
+        features = calculate_cern_features(electron_pair)
+        logger.info(f"Calculated features: {features}")
+        
+        # Make prediction
+        result = predictor.predict(
+            data=[features],
+            return_probabilities=False
+        )
+        
+        # Get model info
+        model_info = model_loader.get_model_info()
+        
+        # Build response
+        response = CERNPredictionResponse(
+            predicted_mass=float(result["predictions"][0]),
+            input_features=features,
+            model_name=model_info.get("name", settings.model_name),
+            model_version=model_info.get("version", settings.model_version)
+        )
+        
+        logger.info(f"Prediction completed: mass={response.predicted_mass:.4f} GeV/c²")
+        return response
+        
+    except Exception as e:
+        logger.error(f"CERN prediction failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prediction failed: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

@@ -68,7 +68,112 @@ MODEL_STAGE=Production
 
 ## 📝 Uso
 
-### Ejemplo de Predicción con Datos CERN
+### Endpoint Específico para CERN (Recomendado) ⭐
+
+Este endpoint acepta **solo los datos raw del detector** y calcula automáticamente las features derivadas.
+
+#### Ventajas:
+- ✅ Request más simple (solo 8 campos en lugar de 9)
+- ✅ Validación automática de rangos físicos
+- ✅ No puedes enviar features inconsistentes
+- ✅ Documentación interactiva en Swagger
+
+#### Datos requeridos:
+
+**Datos raw del detector:**
+- `pt1`, `pt2` - Momento transversal de cada electrón (GeV/c) **[> 0]**
+- `eta1`, `eta2` - Pseudorapidez **[-5, 5]**
+- `phi1`, `phi2` - Ángulo azimutal en radianes **[-π, π]**
+- `charge1`, `charge2` - Carga del electrón **{-1, 1}**
+
+**El backend calcula automáticamente:**
+- `E_total` - Energía total del sistema
+- `delta_eta`, `delta_phi`, `delta_R` - Separaciones angulares
+- `pt_product`, `pt_ratio` - Relaciones de momento
+- `is_os` - Indicador de carga opuesta
+
+#### Ejemplo de Request (CERN)
+
+**Linux/macOS/WSL:**
+```bash
+curl -X POST "http://localhost:8800/predict/cern" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pt1": 11.4625,
+    "eta1": 1.5,
+    "phi1": 0.8,
+    "pt2": 2.01051,
+    "eta2": 0.223163,
+    "phi2": 2.064423,
+    "charge1": 1,
+    "charge2": -1
+  }'
+```
+
+**Windows (CMD o Git Bash):**
+
+Crea `test_cern.json`:
+```json
+{
+  "pt1": 11.4625,
+  "eta1": 1.5,
+  "phi1": 0.8,
+  "pt2": 2.01051,
+  "eta2": 0.223163,
+  "phi2": 2.064423,
+  "charge1": 1,
+  "charge2": -1
+}
+```
+
+Ejecuta:
+```cmd
+curl.exe -X POST http://localhost:8800/predict/cern -H "Content-Type: application/json" -d "@test_cern.json"
+```
+
+#### Respuesta (CERN)
+
+```json
+{
+  "predicted_mass": 14.888267257690413,
+  "input_features": {
+    "pt1": 11.4625,
+    "pt2": 2.01051,
+    "E_total": 24.79094,
+    "delta_eta": 1.276837,
+    "delta_phi": 1.264423,
+    "delta_R": 1.796964,
+    "pt_product": 23.045471,
+    "pt_ratio": 5.701290,
+    "is_os": 1.0
+  },
+  "model_name": "cern_xgboost",
+  "model_version": "1",
+  "timestamp": "2026-06-21T10:00:00"
+}
+```
+
+La predicción `14.888` GeV/c² es la masa invariante estimada del par de electrones.
+
+#### Validación Automática
+
+Si envías datos inválidos, recibirás un error claro:
+
+```json
+// pt negativo
+{"pt1": -10, ...}
+→ "Input should be greater than 0"
+
+// charge inválida
+{"charge1": 0, ...}
+→ "Charge must be -1 or 1"
+
+// eta fuera de rango
+{"eta1": 10, ...}
+→ "Input should be less than or equal to 5"
+```
+
+### Ejemplo de Predicción con Datos CERN (Método anterior)
 
 El modelo entrenado con el DAG `process_cern_data` predice la **masa invariante (M)** a partir de 9 características:
 

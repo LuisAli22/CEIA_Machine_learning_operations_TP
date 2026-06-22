@@ -24,6 +24,8 @@ from sklearn.metrics import (
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
+from postgres_utils import insert_training_metrics, update_model_promotion
+
 
 # Configuration
 MLFLOW_TRACKING_URI = "http://mlflow:5000"
@@ -394,10 +396,43 @@ def validate_model(**context) -> bool:
     return is_valid
 
 
+def save_metrics_to_postgres(**context) -> int:
+    """
+    Save training metrics to PostgreSQL database.
+    """
+    print("Guardando métricas en PostgreSQL...")
+    ti = context['ti']
+    
+    # Get data from previous tasks
+    run_id = ti.xcom_pull(key='run_id', task_ids='train_model')
+    metrics = ti.xcom_pull(key='metrics', task_ids='evaluate_model')
+    data_info = ti.xcom_pull(key='data_info', task_ids='load_data')
+    is_valid = ti.xcom_pull(key='is_valid', task_ids='validate_model')
+    best_params = ti.xcom_pull(key='best_params', task_ids='optimize_hyperparameters')
+    best_cv_rmse = ti.xcom_pull(key='best_cv_rmse', task_ids='optimize_hyperparameters')
+    
+    # Insert metrics
+    record_id = insert_training_metrics(
+        run_id=run_id,
+        model_name=MODEL_NAME,
+        experiment_name=EXPERIMENT_NAME,
+        metrics=metrics,
+        model_params=best_params if best_params else XGBOOST_PARAMS,
+        data_info=data_info,
+        is_valid=is_valid,
+        optuna_cv_rmse=best_cv_rmse,
+        n_trials=N_TRIALS if best_params else None
+    )
+    
+    ti.xcom_push(key='postgres_record_id', value=record_id)
+    return record_id
+
+
 def promote_model_to_production(**context) -> None:
     print("Promoviendo modelo a Producción...")
     ti = context['ti']
     is_valid = ti.xcom_pull(key='is_valid', task_ids='validate_model')
+    run_id = ti.xcom_pull(key='run_id', task_ids='train_model')
 
     if not is_valid:
         print("El modelo no aprobó la validación. Omitiendo promoción.")
@@ -431,6 +466,16 @@ def promote_model_to_production(**context) -> None:
     )
 
     print(f" Modelo versión {latest_version} promovido a Producción")
+    
+    # Update PostgreSQL with promotion info
+    try:
+        update_model_promotion(
+            run_id=run_id,
+            model_version=str(latest_version),
+            model_stage="Production"
+        )
+    except Exception as e:
+        print(f"⚠ Error actualizando PostgreSQL: {str(e)}")
     
     # Clean up temporary file
     data_path = ti.xcom_pull(key='data_path', task_ids='load_data')
@@ -472,9 +517,14 @@ with DAG(
         python_callable=validate_model,
     )
 
+    save_to_postgres_task = PythonOperator(
+        task_id='save_to_postgres',
+        python_callable=save_metrics_to_postgres,
+    )
+
     promote_model_task = PythonOperator(
         task_id='promote_model',
         python_callable=promote_model_to_production,
     )
 
-    load_data_task >> optimize_task >> train_model_task >> evaluate_model_task >> validate_model_task >> promote_model_task
+    load_data_task >> optimize_task >> train_model_task >> evaluate_model_task >> validate_model_task >> save_to_postgres_task >> promote_model_task
