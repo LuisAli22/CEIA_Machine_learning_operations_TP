@@ -4,7 +4,7 @@
 
 **Integrantes:**
 * Luis Ali (a2401)
-* Santiago Bartolini Rizzo (a2402)
+* Santiago Ignacio Bartolini Rizzo (a2402)
 
 ### Descripción
 
